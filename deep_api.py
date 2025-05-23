@@ -49,9 +49,10 @@ def chromedriver(install=False):
     data = response.json()
 
     version = data['channels']['Stable']['version']
-    chromedriver_path = os.path.join(os.path.dirname(__file__), "chromedriver.exe")
+    chromedriver_path = os.path.join(os.path.dirname(__file__), "program_files/chromedriver.exe")
 
     if install:
+        path = os.path.join(os.path.dirname(__file__), install)
         if not os.path.exists(chromedriver_path):
             # Выбираем URL для текущей ОС
             if sys.platform == 'win32':
@@ -68,12 +69,12 @@ def chromedriver(install=False):
                         if item['platform'] == 'mac-x64')
             # Скачиваем архив
             print(f"Installing chromedriver {version}...")
-            zip_path = os.path.join(os.path.dirname(__file__), "chromedriver.zip")
+            zip_path = os.path.join(path, "chromedriver.zip")
             with open(zip_path, 'wb') as f:
                 f.write(requests.get(url).content)
             # Распаковываем
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(os.path.dirname(__file__))
+                zip_ref.extractall(path)
             # Удаляем архив
             os.remove(zip_path)
             # Переименовываем файл (для Windows)
@@ -100,10 +101,12 @@ class UserTokenError(Exception):
 
 class dpsk:
     # Инициирование deepseek, получает на вход 3 аргумента максимум
-    #- ваш userToken на сайте дипсик (важно), промпт дипсику, а так же скачивать ли chromedriver (иначе при каждом запуске будет качаться
-    def __init__(self, userToken, prompt=None, inst_chrdriver=False):
+    #- ваш userToken на сайте дипсик (важно), промпт дипсику,
+    #а так же скачивать ли chromedriver, можно ввести папку установки
+    #(иначе при каждом запуске будет качаться заново)
+    def __init__(self, userToken, prompt=None, install_chromedriver=False):
         print("Chrome initialization...")
-        chromedriver_path, version = chromedriver(inst_chrdriver)
+        chromedriver_path, version = chromedriver(install_chromedriver)
         self.driver = Chrome(version_main=version, driver_executable_path=chromedriver_path, headless=False)
 
         self.count_msgs = 0
@@ -130,7 +133,17 @@ class dpsk:
             buttons[1].click()
 
         chat_input = self.driver.find_element("id", "chat-input")
-        chat_input.send_keys(text)
+        text_chunks = [text[i:i+15] for i in range(0, len(text), 15)]
+        for chunk in text_chunks:
+            if "\n" in chunk:
+                parts = chunk.split("\n")
+                for i, part in enumerate(parts):
+                    if part:
+                        chat_input.send_keys(part)
+                    if i != len(parts)-1:
+                        chat_input.send_keys(Keys.SHIFT + Keys.ENTER)
+            else:
+                chat_input.send_keys(chunk)
         chat_input.send_keys(Keys.ENTER)
 
         result = None
