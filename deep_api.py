@@ -52,7 +52,10 @@ def chromedriver(install=False):
     chromedriver_path = os.path.join(os.path.dirname(__file__), "program_files/chromedriver.exe")
 
     if install:
-        path = os.path.join(os.path.dirname(__file__), install)
+        if install!=True:
+            path = os.path.join(os.path.dirname(__file__), install)
+        else:
+            path = ""
         if not os.path.exists(chromedriver_path):
             # Выбираем URL для текущей ОС
             if sys.platform == 'win32':
