@@ -197,7 +197,7 @@ class dpsk:
 if __name__=="__main__":
     userToken = "your userToken"
     prompt = "Ты обычный DeepSeek."
-    chat = dpsk(userToken, prompt=prompt, inst_chrdriver=True)
+    chat = dpsk(userToken, prompt=prompt, install_chromedriver=True)
 
     try:
         while True:
