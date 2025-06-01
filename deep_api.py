@@ -39,6 +39,20 @@ import sys
 import requests
 import zipfile
 import json
+import psutil
+
+def close_processes(process_names):
+    for proc in psutil.process_iter():
+        for name in process_names:
+            if name.lower() in proc.name().lower():
+                proc.kill()
+                print(f"Process {proc.pid} ({proc.name()}) has been terminated.")
+
+# команда для закрытия всех процессов связанных с chrome
+#желательно использовать при импорте библиотеки если ваша программа часто перезапускается
+def close_chromedrivers():
+    process_names = ["chrome.exe", "chromedriver.exe"]
+    close_processes(process_names)
 
 
 # Скачивание chromedriver
@@ -125,7 +139,7 @@ class dpsk:
             self.driver.execute_script(f"window.localStorage.setItem('{key}', '{value}');")
 
         self.driver.get("https://chat.deepseek.com")
-        self.refresh(prompt=prompt)
+        self.del_history(prompt=prompt)
 
     # Команда для запроса нейронке, на вход подаётся текст и параметры - глубокое размышление и поиск
     def chat(self, text, think=False, search=False):        
@@ -136,17 +150,18 @@ class dpsk:
             buttons[1].click()
 
         chat_input = self.driver.find_element("id", "chat-input")
-        text_chunks = [text[i:i+15] for i in range(0, len(text), 15)]
-        for chunk in text_chunks:
-            if "\n" in chunk:
-                parts = chunk.split("\n")
-                for i, part in enumerate(parts):
-                    if part:
-                        chat_input.send_keys(part)
-                    if i != len(parts)-1:
-                        chat_input.send_keys(Keys.SHIFT + Keys.ENTER)
-            else:
-                chat_input.send_keys(chunk)
+        text_chunks = [text[i:i+50] for i in range(0, len(text), 50)]
+        while not chat_input.get_attribute('value'):
+            for chunk in text_chunks:
+                if "\n" in chunk:
+                    parts = chunk.split("\n")
+                    for i, part in enumerate(parts):
+                        if part:
+                            chat_input.send_keys(part)
+                        if i != len(parts)-1:
+                            chat_input.send_keys(Keys.SHIFT + Keys.ENTER)
+                else:
+                    chat_input.send_keys(chunk)
         chat_input.send_keys(Keys.ENTER)
 
         result = None
@@ -159,7 +174,15 @@ class dpsk:
                         result = target_markdown.text
             except: pass
             try:
-                busy_server = self.driver.find_element(By.CSS_SELECTOR, 'span:contains("Server busy, please try again later.")')
+                busy_server = self.driver.find_element(
+                    By.XPATH, "//span[text()='Server busy, please try again later.']")
+                if busy_server:
+                    result = None
+                    break
+            except: pass
+            try:
+                busy_server = self.driver.find_element(
+                    By.XPATH, "//span[text()='Check network and retry.']")
                 if busy_server:
                     result = None
                     break
@@ -172,14 +195,14 @@ class dpsk:
             buttons[1].click()
 
         if not result:
-            self.refresh()
-
+            self.count_msgs -= 1
+            self.driver.refresh()
         return result
 
     # Команда для очистки истории (практически просто создаёт новый чат), можно задать промпт
-    def refresh(self, prompt=None):
+    def del_history(self, prompt=None):
         self.count_msgs = 0
-        self.driver.refresh()
+        self.driver.get("https://chat.deepseek.com")
 
         if not self.driver.current_url=="https://chat.deepseek.com/sign_in":
             print("DeepSeek started!\n\n")
