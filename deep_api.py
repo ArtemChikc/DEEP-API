@@ -162,7 +162,6 @@ class dpsk:
             self.driver.execute_script(f"window.localStorage.setItem('{key}', '{value}');")
 
         self.driver.get("https://chat.deepseek.com")
-        self.driver.save_screenshot("screenshot.png")
         self.del_history(prompt=prompt)
 
 
