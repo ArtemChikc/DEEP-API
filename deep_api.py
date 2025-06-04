@@ -1,4 +1,4 @@
-print("""
+"""
           ░░░░▒▓▓▓▓▓▓▓▓▓▓▒░░░░░         
        ░░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░       
       ░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░     
@@ -21,17 +21,17 @@ print("""
      ░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░░   
         ░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░░      
           ░░░░▒▓▓▓▓▓▓▓▓▓▓▒░░░░░░
-
+"""
+print("""
 ░█▀▀▄ ░█▀▀▀ ░█▀▀▀ ░█▀▀█ ── ─█▀▀█ ░█▀▀█ ▀█▀ 
 ░█─░█ ░█▀▀▀ ░█▀▀▀ ░█▄▄█ ▀▀ ░█▄▄█ ░█▄▄█ ░█─ 
 ░█▄▄▀ ░█▄▄▄ ░█▄▄▄ ░█─── ── ░█─░█ ░█─── ▄█▄
     the free api library of deepseek
             ｂｙ ｂ１ｔ０ｎｅ
         tg: https://t.me/u53rnm3
-    github: https://github.com/ArtemChikc
-""")
+    github: https://github.com/ArtemChikc""")
 
-from undetected_chromedriver import Chrome
+from undetected_chromedriver import Chrome, ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 import os
@@ -118,13 +118,36 @@ class UserTokenError(Exception):
 
 class dpsk:
     # Инициирование deepseek, получает на вход 3 аргумента максимум
-    #- ваш userToken на сайте дипсик (важно), промпт дипсику,
+    #- ваш userToken с сайта дипсик (важно), промпт дипсику,
     #а так же скачивать ли chromedriver, можно ввести папку установки
     #(иначе при каждом запуске будет качаться заново)
-    def __init__(self, userToken, prompt=None, install_chromedriver=False):
+    def __init__(self, userToken, prompt=None,
+                 install_chromedriver=False, headless=True):
         print("Chrome initialization...")
+        options = ChromeOptions()
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-popup-blocking")
+        options.add_argument("--profile-directory=Default")
+        options.add_argument("--disable-plugins-discovery")
+        options.add_argument("--start-maximized")
+        if headless:
+            options.add_argument("--headless=new")
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
         chromedriver_path, version = chromedriver(install_chromedriver)
-        self.driver = Chrome(version_main=version, driver_executable_path=chromedriver_path, headless=False)
+        self.driver = Chrome(version_main=version, options=options,
+                             driver_executable_path=chromedriver_path,
+                             use_subprocess=False)
+        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            """
+        })
 
         self.count_msgs = 0
         self.prompt = prompt
@@ -139,7 +162,32 @@ class dpsk:
             self.driver.execute_script(f"window.localStorage.setItem('{key}', '{value}');")
 
         self.driver.get("https://chat.deepseek.com")
+        self.driver.save_screenshot("screenshot.png")
         self.del_history(prompt=prompt)
+
+
+    def get_message(self):
+        result = None
+        try:
+            markdown_blocks = self.driver.find_elements(By.CSS_SELECTOR, 'div.ds-markdown.ds-markdown--block')
+            if self.count_msgs+1==len(markdown_blocks):
+                target_markdown = markdown_blocks[self.count_msgs]
+                if target_markdown.find_element(By.XPATH, './following-sibling::div[contains(@class, "ds-flex")][1]'):
+                    result = target_markdown.text
+        except: pass
+        try:
+            busy_server = self.driver.find_element(
+                By.XPATH, "//span[text()='Server busy, please try again later.']")
+            if busy_server:
+                result = "break"
+        except: pass
+        try:
+            busy_server = self.driver.find_element(
+                By.XPATH, "//span[text()='Check network and retry.']")
+            if busy_server:
+                result = "break"
+        except: pass
+        return result
 
     # Команда для запроса нейронке, на вход подаётся текст и параметры - глубокое размышление и поиск
     def chat(self, text, think=False, search=False):        
@@ -150,6 +198,7 @@ class dpsk:
             buttons[1].click()
 
         chat_input = self.driver.find_element("id", "chat-input")
+        chat_input.clear()
         text_chunks = [text[i:i+50] for i in range(0, len(text), 50)]
         while not chat_input.get_attribute('value'):
             for chunk in text_chunks:
@@ -166,27 +215,10 @@ class dpsk:
 
         result = None
         while not result:
-            try:
-                markdown_blocks = self.driver.find_elements(By.CSS_SELECTOR, 'div.ds-markdown.ds-markdown--block')
-                if self.count_msgs+1==len(markdown_blocks):
-                    target_markdown = markdown_blocks[self.count_msgs]
-                    if target_markdown.find_element(By.XPATH, './following-sibling::div[contains(@class, "ds-flex")][1]'):
-                        result = target_markdown.text
-            except: pass
-            try:
-                busy_server = self.driver.find_element(
-                    By.XPATH, "//span[text()='Server busy, please try again later.']")
-                if busy_server:
-                    result = None
-                    break
-            except: pass
-            try:
-                busy_server = self.driver.find_element(
-                    By.XPATH, "//span[text()='Check network and retry.']")
-                if busy_server:
-                    result = None
-                    break
-            except: pass
+            result = self.get_message()
+            if result=="break":
+                result = None
+                break
         self.count_msgs += 1
 
         if think:
@@ -197,6 +229,7 @@ class dpsk:
         if not result:
             self.count_msgs -= 1
             self.driver.refresh()
+            return self.chat(text, think, search)
         return result
 
     # Команда для очистки истории (практически просто создаёт новый чат), можно задать промпт
@@ -211,9 +244,11 @@ class dpsk:
             raise UserTokenError("invalid userToken")
         
         if prompt or self.prompt:
+            print("Sending prompt to DeepSeek...")
             if prompt:
                 self.prompt = prompt
             self.chat(self.prompt)
+            print("Complete!\n")
 
 
 # Простой пример использования api
