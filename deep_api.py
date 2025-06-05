@@ -67,7 +67,7 @@ def chromedriver(install=False):
     else:
         path = os.path.join(os.path.dirname(__file__), "program_files", "chromedriver.exe")
 
-    if install and not os.path.exists(chromedriver_path):
+    if install and not os.path.exists(path):
         if sys.platform == 'win32':
             url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
                     if item['platform'] == 'win32')
@@ -97,7 +97,7 @@ def chromedriver(install=False):
             os.rename(old_path, chromedriver_path)
         print("Chromedriver is installed successfully!")
 
-    return chromedriver_path, int(version.split(".")[0])
+    return path, int(version.split(".")[0])
 
 
 
