@@ -31,7 +31,7 @@ print("""
         tg: https://t.me/u53rnm3
     github: https://github.com/ArtemChikc""")
 
-from undetected_chromedriver import Chrome, ChromeOptions
+from undetected_chromedriver import Chrome
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 import os
