@@ -57,53 +57,45 @@ def close_chromedrivers():
 
 # Скачивание chromedriver
 def chromedriver(install=False):
-    # Определяем последнюю стабильную версию Chrome
     latest_release_url = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
     response = requests.get(latest_release_url)
     data = response.json()
 
     version = data['channels']['Stable']['version']
-    chromedriver_path = os.path.join(os.path.dirname(__file__), "program_files/chromedriver.exe")
+    if install and install!=True:
+        path = os.path.join(os.path.dirname(__file__), install)
+    else:
+        path = os.path.join(os.path.dirname(__file__), "program_files", "chromedriver.exe")
 
-    if install:
-        if install!=True:
-            path = os.path.join(os.path.dirname(__file__), install)
-        else:
-            path = ""
-        if not os.path.exists(chromedriver_path):
-            # Выбираем URL для текущей ОС
+    if install and not os.path.exists(chromedriver_path):
+        if sys.platform == 'win32':
+            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
+                    if item['platform'] == 'win32')
+        if sys.platform == 'win64':
+            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
+                    if item['platform'] == 'win64')
+        elif sys.platform == 'linux':
+            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver']
+                    if item['platform'] == 'linux64')
+        elif sys.platform == 'darwin':
+            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver']
+                    if item['platform'] == 'mac-x64')
+        print(f"Installing chromedriver {version}...")
+        zip_path = os.path.join(path, "chromedriver.zip")
+        with open(zip_path, 'wb') as f:
+            f.write(requests.get(url).content)
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(path)
+        os.remove(zip_path)
+        if sys.platform.startswith('win'):
             if sys.platform == 'win32':
-                url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
-                        if item['platform'] == 'win32')
-            if sys.platform == 'win64':
-                url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
-                        if item['platform'] == 'win64')
-            elif sys.platform == 'linux':
-                url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver']
-                        if item['platform'] == 'linux64')
-            elif sys.platform == 'darwin':
-                url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver']
-                        if item['platform'] == 'mac-x64')
-            # Скачиваем архив
-            print(f"Installing chromedriver {version}...")
-            zip_path = os.path.join(path, "chromedriver.zip")
-            with open(zip_path, 'wb') as f:
-                f.write(requests.get(url).content)
-            # Распаковываем
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(path)
-            # Удаляем архив
-            os.remove(zip_path)
-            # Переименовываем файл (для Windows)
-            if sys.platform.startswith('win'):
-                if sys.platform == 'win32':
-                    old_path = os.path.join(os.path.dirname(__file__), "chromedriver-win32", "chromedriver.exe")
-                elif sys.platform == 'win64':
-                    old_path = os.path.join(os.path.dirname(__file__), "chromedriver-win64", "chromedriver.exe")
-                if os.path.exists(chromedriver_path):
-                    os.remove(chromedriver_path)
-                os.rename(old_path, chromedriver_path)
-            print("Chromedriver is installed successfully!")
+                old_path = os.path.join(path, "chromedriver-win32", "chromedriver.exe")
+            elif sys.platform == 'win64':
+                old_path = os.path.join(path, "chromedriver-win64", "chromedriver.exe")
+            if os.path.exists(chromedriver_path):
+                os.remove(chromedriver_path)
+            os.rename(old_path, chromedriver_path)
+        print("Chromedriver is installed successfully!")
 
     return chromedriver_path, int(version.split(".")[0])
 
@@ -124,23 +116,9 @@ class dpsk:
     def __init__(self, userToken, prompt=None,
                  install_chromedriver=False, headless=True):
         print("Chrome initialization...")
-        options = ChromeOptions()
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-popup-blocking")
-        options.add_argument("--profile-directory=Default")
-        options.add_argument("--disable-plugins-discovery")
-        options.add_argument("--start-maximized")
-        if headless:
-            options.add_argument("--headless=new")
-        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
         chromedriver_path, version = chromedriver(install_chromedriver)
-        self.driver = Chrome(version_main=version, options=options,
-                             driver_executable_path=chromedriver_path,
-                             use_subprocess=False)
+        self.driver = Chrome(version_main=version, headless=headless,
+                             driver_executable_path=chromedriver_path)
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
             Object.defineProperty(navigator, 'webdriver', {
@@ -197,19 +175,20 @@ class dpsk:
             buttons[1].click()
 
         chat_input = self.driver.find_element("id", "chat-input")
-        chat_input.clear()
-        text_chunks = [text[i:i+50] for i in range(0, len(text), 50)]
         while not chat_input.get_attribute('value'):
-            for chunk in text_chunks:
-                if "\n" in chunk:
-                    parts = chunk.split("\n")
-                    for i, part in enumerate(parts):
-                        if part:
-                            chat_input.send_keys(part)
-                        if i != len(parts)-1:
-                            chat_input.send_keys(Keys.SHIFT + Keys.ENTER)
-                else:
-                    chat_input.send_keys(chunk)
+            chat_input.clear()
+            text_chunks = [text[i:i+50] for i in range(0, len(text), 50)]
+            while not chat_input.get_attribute('value'):
+                for chunk in text_chunks:
+                    if "\n" in chunk:
+                        parts = chunk.split("\n")
+                        for i, part in enumerate(parts):
+                            if part:
+                                chat_input.send_keys(part)
+                            if i != len(parts)-1:
+                                chat_input.send_keys(Keys.SHIFT + Keys.ENTER)
+                    else:
+                        chat_input.send_keys(chunk)
         chat_input.send_keys(Keys.ENTER)
 
         result = None
