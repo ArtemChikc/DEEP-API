@@ -20,8 +20,7 @@
    ░░▒▓▓▓▓▓▓▓▒░░░░░▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░  
      ░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░░   
         ░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░░      
-          ░░░░▒▓▓▓▓▓▓▓▓▓▓▒░░░░░░
-"""
+          ░░░░▒▓▓▓▓▓▓▓▓▓▓▒░░░░░░         """
 print("""
 ░█▀▀▄ ░█▀▀▀ ░█▀▀▀ ░█▀▀█ ── ─█▀▀█ ░█▀▀█ ▀█▀ 
 ░█─░█ ░█▀▀▀ ░█▀▀▀ ░█▄▄█ ▀▀ ░█▄▄█ ░█▄▄█ ░█─ 
@@ -60,14 +59,20 @@ def chromedriver(install=False):
     latest_release_url = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
     response = requests.get(latest_release_url)
     data = response.json()
-
     version = data['channels']['Stable']['version']
+
     if install and install!=True:
         path = os.path.join(os.path.dirname(__file__), install)
     else:
-        path = os.path.join(os.path.dirname(__file__), "program_files", "chromedriver.exe")
+        path = os.path.dirname(__file__)
+    if not install:
+        chromedriver_path = False
+    else:
+        chromedriver_path = os.path.join(path, "chromedriver.exe")
+    if not os.path.exists(path):
+        os.makedirs(path)
 
-    if install and not os.path.exists(path):
+    if install and not os.path.exists(chromedriver_path):
         if sys.platform == 'win32':
             url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
                     if item['platform'] == 'win32')
@@ -89,15 +94,19 @@ def chromedriver(install=False):
         os.remove(zip_path)
         if sys.platform.startswith('win'):
             if sys.platform == 'win32':
-                old_path = os.path.join(path, "chromedriver-win32", "chromedriver.exe")
+                old_path = os.path.join(path, "chromedriver-win32")
             elif sys.platform == 'win64':
-                old_path = os.path.join(path, "chromedriver-win64", "chromedriver.exe")
+                old_path = os.path.join(path, "chromedriver-win64")
+            chromedriver_old_path = os.path.join(old_path, "chromedriver.exe")
             if os.path.exists(chromedriver_path):
                 os.remove(chromedriver_path)
-            os.rename(old_path, chromedriver_path)
+            os.rename(chromedriver_old_path, chromedriver_path)
+            for filename in os.listdir(old_path):
+                os.remove(os.path.join(old_path, filename))
+            os.rmdir(old_path)
         print("Chromedriver is installed successfully!")
 
-    return path, int(version.split(".")[0])
+    return chromedriver_path, int(version.split(".")[0])
 
 
 
