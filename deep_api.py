@@ -33,12 +33,8 @@ print("""
 from undetected_chromedriver import Chrome
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import os
-import sys
-import requests
-import zipfile
-import json
 import psutil
+
 
 def close_processes(process_names):
     for proc in psutil.process_iter():
@@ -52,7 +48,6 @@ def close_processes(process_names):
 def close_chromedrivers():
     process_names = ["chrome.exe", "chromedriver.exe"]
     close_processes(process_names)
-
 
 class UserTokenError(Exception):
     def __init__(self, message="Invalid userToken", code=400):
