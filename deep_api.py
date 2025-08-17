@@ -54,62 +54,6 @@ def close_chromedrivers():
     close_processes(process_names)
 
 
-# Скачивание chromedriver
-def chromedriver(install=False):
-    latest_release_url = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
-    response = requests.get(latest_release_url)
-    data = response.json()
-    version = data['channels']['Stable']['version']
-
-    if install and install!=True:
-        path = os.path.join(os.path.dirname(__file__), install)
-    else:
-        path = os.path.dirname(__file__)
-    if not install:
-        chromedriver_path = False
-    else:
-        chromedriver_path = os.path.join(path, "chromedriver.exe")
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-    if install and not os.path.exists(chromedriver_path):
-        if sys.platform == 'win32':
-            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
-                    if item['platform'] == 'win32')
-        if sys.platform == 'win64':
-            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver'] 
-                    if item['platform'] == 'win64')
-        elif sys.platform == 'linux':
-            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver']
-                    if item['platform'] == 'linux64')
-        elif sys.platform == 'darwin':
-            url = next(item['url'] for item in data['channels']['Stable']['downloads']['chromedriver']
-                    if item['platform'] == 'mac-x64')
-        print(f"Installing chromedriver {version}...")
-        zip_path = os.path.join(path, "chromedriver.zip")
-        with open(zip_path, 'wb') as f:
-            f.write(requests.get(url).content)
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(path)
-        os.remove(zip_path)
-        if sys.platform.startswith('win'):
-            if sys.platform == 'win32':
-                old_path = os.path.join(path, "chromedriver-win32")
-            elif sys.platform == 'win64':
-                old_path = os.path.join(path, "chromedriver-win64")
-            chromedriver_old_path = os.path.join(old_path, "chromedriver.exe")
-            if os.path.exists(chromedriver_path):
-                os.remove(chromedriver_path)
-            os.rename(chromedriver_old_path, chromedriver_path)
-            for filename in os.listdir(old_path):
-                os.remove(os.path.join(old_path, filename))
-            os.rmdir(old_path)
-        print("Chromedriver is installed successfully!")
-
-    return chromedriver_path, int(version.split(".")[0])
-
-
-
 class UserTokenError(Exception):
     def __init__(self, message="Invalid userToken", code=400):
         self.code = code
@@ -119,15 +63,10 @@ class UserTokenError(Exception):
 
 class dpsk:
     # Инициирование deepseek, получает на вход 3 аргумента максимум
-    #- ваш userToken с сайта дипсик (важно), промпт дипсику,
-    #а так же скачивать ли chromedriver, можно ввести папку установки
-    #(иначе при каждом запуске будет качаться заново)
-    def __init__(self, userToken, prompt=None,
-                 install_chromedriver=False, headless=True):
+    #- ваш userToken с сайта дипсик (важно), промпт дипсику
+    def __init__(self, userToken, prompt=None, headless=True):
         print("Chrome initialization...")
-        chromedriver_path, version = chromedriver(install_chromedriver)
-        self.driver = Chrome(version_main=version, headless=headless,
-                             driver_executable_path=chromedriver_path)
+        self.driver = Chrome(headless=headless)
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
             Object.defineProperty(navigator, 'webdriver', {
@@ -242,7 +181,7 @@ class dpsk:
 if __name__=="__main__":
     userToken = "your userToken"
     prompt = "Ты обычный DeepSeek."
-    chat = dpsk(userToken, prompt=prompt, install_chromedriver=True)
+    chat = dpsk(userToken, prompt=prompt)
 
     try:
         while True:
